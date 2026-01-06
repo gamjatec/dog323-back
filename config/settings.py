@@ -2,15 +2,21 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+import sys
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR.parent / '.env')  
+if os.path.exists(BASE_DIR.parent / '.env'):
+    load_dotenv(BASE_DIR.parent / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+if not ALLOWED_HOSTS or ALLOWED_HOSTS == ['']:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -62,6 +68,42 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+# 환경변수 디버깅
+print("\n" + "=" * 80)
+print("DATABASE CONFIGURATION DEBUG")
+print("=" * 80)
+
+# 모든 환경변수 확인
+import sys
+print(f"Python version: {sys.version}")
+
+# DATABASE_URL 확인
+DATABASE_URL = os.getenv('DATABASE_URL')
+print(f"\n1. DATABASE_URL exists: {DATABASE_URL is not None}")
+
+if DATABASE_URL:
+    print(f"2. DATABASE_URL length: {len(DATABASE_URL)}")
+    print(f"3. DATABASE_URL first 70 chars: {DATABASE_URL[:70]}...")
+    print(f"4. Starts with 'postgresql://': {DATABASE_URL.startswith('postgresql://')}")
+    print(f"5. Contains 'railway': {'railway' in DATABASE_URL}")
+else:
+    print("2. ❌ DATABASE_URL is COMPLETELY MISSING!")
+    print("\n3. Checking individual DB variables:")
+    print(f"   DB_HOST: {os.getenv('DB_HOST', 'NOT SET')}")
+    print(f"   DB_NAME: {os.getenv('DB_NAME', 'NOT SET')}")
+    print(f"   DB_USER: {os.getenv('DB_USER', 'NOT SET')}")
+    print(f"   DB_PORT: {os.getenv('DB_PORT', 'NOT SET')}")
+    
+print("\n4. All environment variables starting with 'DB' or 'DATABASE':")
+for key, value in os.environ.items():
+    if key.startswith('DB') or key.startswith('DATABASE'):
+        if 'PASSWORD' in key or 'PASS' in key:
+            print(f"   {key}: ***hidden***")
+        else:
+            print(f"   {key}: {value[:50] if len(value) > 50 else value}...")
+
+print("=" * 80 + "\n")
+
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -73,16 +115,45 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #    }
 # }
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.getenv('DB_NAME'),
+#         'USER': os.getenv('DB_USER'),
+#         'PASSWORD': os.getenv('DB_PASSWORD'),
+#         'HOST': os.getenv('DB_HOST'),
+#         'PORT': os.getenv('DB_PORT'),
+#     }
+# }
+
+# 데이터베이스 설정
+if DATABASE_URL:
+    print("✅ Configuring database with DATABASE_URL\n")
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+    print(f"Parsed database config:")
+    print(f"  ENGINE: {DATABASES['default']['ENGINE']}")
+    print(f"  NAME: {DATABASES['default']['NAME']}")
+    print(f"  HOST: {DATABASES['default']['HOST']}")
+    print(f"  PORT: {DATABASES['default']['PORT']}")
+else:
+    print("❌ WARNING: Using fallback local database config - THIS WILL FAIL ON RAILWAY!\n")
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', ''),
+            'USER': os.getenv('DB_USER', ''),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
+    print(f"Fallback database config:")
+    print(f"  HOST: {DATABASES['default']['HOST']}")
+    print(f"  NAME: {DATABASES['default']['NAME']}")
+
+print("=" * 80 + "\n")
 
 
 # Password validation
